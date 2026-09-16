@@ -172,7 +172,7 @@ async function api(action, data = {}) {
 
   if (
     !CONFIG.API_URL ||
-    CONFIG.API_URL.includes("PASTE_YOUR")
+    CONFIG.API_URL.includes("https://script.google.com/macros/s/AKfycbxWbhji9ymacm2tmbYxybsBm9xrWtrPVECym8RgAeFPPOWp4eQurH-aViLQtOw15lY/exec")
   ) {
 
     throw new Error(
