@@ -188,17 +188,17 @@ async function api(action, data = {}) {
   };
 
 
-  const response = await fetch(CONFIG.API_URL, {
+const response = await fetch(CONFIG.API_URL, {
 
-    method: "POST",
+  method: "POST",
 
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8"
-    },
+  headers: {
+    "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+  },
 
-    body: JSON.stringify(payload)
+  body: JSON.stringify(payload)
 
-  });
+});
 
 
   if (!response.ok) {
