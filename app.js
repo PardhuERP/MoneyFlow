@@ -2011,4 +2011,1894 @@ async function saveBudgetAction() {
 
     state.budget = budget;
 
-   
+    saveLocalState();
+
+    showToast(
+      "Budget saved locally. Server sync pending.",
+      "warning"
+    );
+
+    renderCurrentPage();
+
+  }
+
+}
+
+/* =========================================================
+   COPY PREVIOUS BUDGET
+   ========================================================= */
+
+async function copyPreviousBudgetAction() {
+
+  const confirmed =
+    confirm(
+      "Copy last month's budget into this month?"
+    );
+
+
+  if (!confirmed) return;
+
+
+  try {
+
+    await api("copyPreviousBudget", {
+
+      month:
+        state.selectedMonth,
+
+      year:
+        state.selectedYear
+
+    });
+
+
+    await loadInitialData();
+
+    renderCurrentPage();
+
+    showToast(
+      "Previous budget copied",
+      "success"
+    );
+
+  } catch (error) {
+
+    showToast(
+      "Unable to copy previous budget",
+      "error"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   INSIGHTS PAGE
+   ========================================================= */
+
+function renderInsightsPage() {
+
+  const data =
+    state.dashboard || {};
+
+
+  const summary =
+    data.summary || {};
+
+
+  const expenses =
+    getMonthExpenses();
+
+
+  const totalSpent =
+    expenses.reduce(
+      (sum, expense) =>
+        sum + number(expense.Amount),
+      0
+    );
+
+
+  const dailyAverage =
+    expenses.length
+      ? totalSpent /
+        Math.max(
+          1,
+          new Date().getDate()
+        )
+      : 0;
+
+
+  const daysRemaining =
+    calculateDaysRemaining();
+
+
+  const balance =
+    getTotalAllocated() -
+    totalSpent;
+
+
+  const estimatedEnd =
+    Math.max(
+      0,
+      balance -
+      dailyAverage * daysRemaining
+    );
+
+
+  const categoryStats =
+    getCategoryStats();
+
+
+  const highest =
+    categoryStats
+      .sort(
+        (a, b) =>
+          b.spent - a.spent
+      )[0];
+
+
+  mainContent().innerHTML = `
+
+    <section class="page">
+
+      <div class="page-header">
+
+        <div>
+
+          <div class="eyebrow">
+            MONEY ANALYSIS
+          </div>
+
+          <h1>
+            Insights
+          </h1>
+
+          <p class="muted">
+            Understand your spending pattern.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="insight-grid">
+
+
+        <div class="insight-card">
+
+          <span>
+            Daily Average
+          </span>
+
+          <strong>
+            ${money(dailyAverage)}
+          </strong>
+
+        </div>
+
+
+        <div class="insight-card">
+
+          <span>
+            Estimated Month-End Balance
+          </span>
+
+          <strong>
+            ${money(estimatedEnd)}
+          </strong>
+
+        </div>
+
+
+        ${
+          highest
+            ? `
+              <div class="insight-card">
+
+                <span>
+                  Highest Spending Category
+                </span>
+
+                <strong>
+                  ${escapeHtml(highest.category)}
+                </strong>
+
+                <small>
+                  ${money(highest.spent)} spent
+                </small>
+
+              </div>
+            `
+            : ""
+        }
+
+
+      </div>
+
+
+      <div class="card">
+
+        <div class="card-header">
+
+          <div>
+
+            <span class="eyebrow">
+              CATEGORY BREAKDOWN
+            </span>
+
+            <h3>
+              Where Your Money Goes
+            </h3>
+
+          </div>
+
+        </div>
+
+
+        ${renderInsightCategoryBars(categoryStats)}
+
+      </div>
+
+
+      <div class="card">
+
+        <div class="card-header">
+
+          <div>
+
+            <span class="eyebrow">
+              AI-STYLE OBSERVATIONS
+            </span>
+
+            <h3>
+              Suggestions
+            </h3>
+
+          </div>
+
+        </div>
+
+
+        ${generateInsights()}
+
+      </div>
+
+
+    </section>
+
+  `;
+
+}
+
+/* =========================================================
+   INSIGHT CATEGORY BARS
+   ========================================================= */
+
+function renderInsightCategoryBars(stats) {
+
+  if (!stats.length) {
+
+    return emptyState(
+      "No spending data",
+      "Add expenses to generate insights."
+    );
+
+  }
+
+
+  const max =
+    Math.max(
+      ...stats.map(item => item.spent),
+      1
+    );
+
+
+  return stats
+    .filter(item => item.spent > 0)
+    .sort(
+      (a, b) =>
+        b.spent - a.spent
+    )
+    .map(item => `
+
+      <div class="summary-row">
+
+        <div class="summary-row-top">
+
+          <span>
+            ${escapeHtml(item.category)}
+          </span>
+
+          <strong>
+            ${money(item.spent)}
+          </strong>
+
+        </div>
+
+
+        <div class="progress-track">
+
+          <div
+            class="progress-fill"
+            style="width:${(item.spent / max) * 100}%">
+          </div>
+
+        </div>
+
+      </div>
+
+    `)
+    .join("");
+
+}
+
+
+/* =========================================================
+   INSIGHT GENERATOR
+   ========================================================= */
+
+function generateInsights() {
+
+  const insights = [];
+
+
+  const income =
+    getSettingNumber(
+      "MonthlyIncome",
+      80000
+    );
+
+
+  const spent =
+    getMonthExpenses()
+      .reduce(
+        (sum, e) =>
+          sum + number(e.Amount),
+        0
+      );
+
+
+  const allocated =
+    getTotalAllocated();
+
+
+  const usedPercent =
+    allocated > 0
+      ? (spent / allocated) * 100
+      : 0;
+
+
+  if (allocated > income) {
+
+    insights.push(
+      "Your current allocations are above monthly income. Review the budget before adding more spending."
+    );
+
+  }
+
+
+  if (usedPercent >= 90) {
+
+    insights.push(
+      "You have used more than 90% of your allocated budget. Review remaining category balances before discretionary spending."
+    );
+
+  } else if (usedPercent >= 75) {
+
+    insights.push(
+      "You have used more than 75% of your allocated budget. Keep an eye on the remaining days of the month."
+    );
+
+  } else {
+
+    insights.push(
+      "Your spending is currently below 75% of allocated budget. Continue tracking actual expenses to understand your normal pattern."
+    );
+
+  }
+
+
+  const unallocated =
+    income - allocated;
+
+
+  if (unallocated > 0) {
+
+    insights.push(
+      `${money(unallocated)} is currently unallocated. You can assign it to a category, Savings, or Emergency Fund.`
+    );
+
+  }
+
+
+  if (!insights.length) {
+
+    insights.push(
+      "Keep recording expenses consistently. More actual data will make the analysis more useful."
+    );
+
+  }
+
+
+  return insights.map(message => `
+
+    <div class="insight-message">
+
+      <span class="insight-dot"></span>
+
+      <p>
+        ${escapeHtml(message)}
+      </p>
+
+    </div>
+
+  `).join("");
+
+}
+
+
+/* =========================================================
+   SETTINGS PAGE
+   ========================================================= */
+
+function renderSettingsPage() {
+
+  const income =
+    getSettingNumber(
+      "MonthlyIncome",
+      80000
+    );
+
+
+  const rent =
+    getSettingNumber(
+      "Rent",
+      12500
+    );
+
+
+  const electricity =
+    getSettingNumber(
+      "Electricity",
+      500
+    );
+
+
+  mainContent().innerHTML = `
+
+    <section class="page">
+
+      <div class="page-header">
+
+        <div>
+
+          <div class="eyebrow">
+            PREFERENCES
+          </div>
+
+          <h1>
+            Settings
+          </h1>
+
+          <p class="muted">
+            Configure your MoneyFlow system.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="card settings-card">
+
+        <h3>
+          Monthly Income
+        </h3>
+
+        <label>
+
+          Monthly Income
+
+          <input
+            id="settingIncome"
+            type="number"
+            value="${income}"
+            min="0">
+
+        </label>
+
+      </div>
+
+
+      <div class="card settings-card">
+
+        <h3>
+          Fixed Expenses
+        </h3>
+
+
+        <label>
+
+          Rent
+
+          <input
+            id="settingRent"
+            type="number"
+            value="${rent}"
+            min="0">
+
+        </label>
+
+
+        <label>
+
+          Electricity
+
+          <input
+            id="settingElectricity"
+            type="number"
+            value="${electricity}"
+            min="0">
+
+        </label>
+
+
+        <p class="muted">
+          Current fixed total:
+          ${money(rent + electricity)}
+        </p>
+
+      </div>
+
+
+      <div class="card settings-card">
+
+        <h3>
+          Alerts
+        </h3>
+
+        <label class="switch-row">
+
+          <span>
+            Budget Alerts
+          </span>
+
+          <input
+            id="alertsEnabled"
+            type="checkbox"
+            ${
+              String(
+                state.settings?.AlertsEnabled
+              ) === "true"
+                ? "checked"
+                : ""
+            }>
+
+        </label>
+
+      </div>
+
+
+      <div class="card settings-card">
+
+        <h3>
+          Appearance
+        </h3>
+
+
+        <button
+          class="secondary-button"
+          onclick="toggleTheme()">
+
+          Toggle Light / Dark Mode
+
+        </button>
+
+      </div>
+
+
+      <div class="card settings-card">
+
+        <h3>
+          Data
+        </h3>
+
+
+        <button
+          class="secondary-button full-width"
+          onclick="exportCSV()">
+
+          Export Expenses CSV
+
+        </button>
+
+
+        <br>
+
+
+        <button
+          class="secondary-button full-width"
+          onclick="resetLocalData()">
+
+          Reset Local App Data
+
+        </button>
+
+      </div>
+
+
+      <button
+        class="primary-button full-width"
+        onclick="saveSettingsAction()">
+
+        Save Settings
+
+      </button>
+
+
+    </section>
+
+  `;
+
+}
+
+/* =========================================================
+   SAVE SETTINGS
+   ========================================================= */
+
+async function saveSettingsAction() {
+
+  const income =
+    number(
+      $("#settingIncome")?.value
+    );
+
+
+  const rent =
+    number(
+      $("#settingRent")?.value
+    );
+
+
+  const electricity =
+    number(
+      $("#settingElectricity")?.value
+    );
+
+
+  const alerts =
+    $("#alertsEnabled")?.checked;
+
+
+  if (income <= 0) {
+
+    showToast(
+      "Monthly income must be greater than zero.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  const settings = {
+
+    MonthlyIncome:
+      String(income),
+
+    Rent:
+      String(rent),
+
+    Electricity:
+      String(electricity),
+
+    AlertsEnabled:
+      String(alerts)
+
+  };
+
+
+  state.settings = {
+    ...state.settings,
+    ...settings
+  };
+
+
+  saveLocalState();
+
+
+  try {
+
+    await api("saveSettings", {
+      settings
+    });
+
+    showToast(
+      "Settings saved",
+      "success"
+    );
+
+  } catch (error) {
+
+    showToast(
+      "Saved locally. Server sync pending.",
+      "warning"
+    );
+
+  }
+
+
+  await refreshDashboard();
+
+  renderCurrentPage();
+
+}
+
+
+/* =========================================================
+   CATEGORY MANAGEMENT
+   ========================================================= */
+
+function getCategoryNames() {
+
+  const names =
+    state.categories
+      .map(category => {
+
+        if (typeof category === "string") {
+
+          return category;
+
+        }
+
+        return (
+          category.CategoryName ||
+          category.categoryName ||
+          ""
+        );
+
+      })
+      .filter(Boolean);
+
+
+  if (!names.length) {
+
+    return [
+
+      "Daily Needs",
+      "Food",
+      "Entertainment",
+      "Rent",
+      "Electricity",
+      "Travel / Trip",
+      "Health",
+      "Shopping",
+      "Bills",
+      "Family",
+      "Education",
+      "Savings",
+      "Emergency",
+      "Other"
+
+    ];
+
+  }
+
+
+  return names;
+
+}
+
+
+function addNewCategory() {
+
+  const name =
+    prompt("Enter new category name:");
+
+  if (!name) return;
+
+
+  const clean =
+    cleanText(name);
+
+
+  if (!clean) return;
+
+
+  if (
+    getCategoryNames()
+      .some(
+        item =>
+          item.toLowerCase() ===
+          clean.toLowerCase()
+      )
+  ) {
+
+    showToast(
+      "Category already exists.",
+      "warning"
+    );
+
+    return;
+
+  }
+
+
+  api("addCategory", {
+    categoryName: clean
+  })
+    .then(() => {
+
+      state.categories.push({
+        CategoryName: clean
+      });
+
+      saveLocalState();
+
+      renderCurrentPage();
+
+      showToast(
+        "Category added",
+        "success"
+      );
+
+    })
+    .catch(error => {
+
+      state.categories.push({
+        CategoryName: clean
+      });
+
+      saveLocalState();
+
+      renderCurrentPage();
+
+      showToast(
+        "Category added locally",
+        "warning"
+      );
+
+    });
+
+}
+
+/* =========================================================
+   SETUP WIZARD
+   ========================================================= */
+
+function showSetupWizard() {
+
+  const income =
+    getSettingNumber(
+      "MonthlyIncome",
+      80000
+    );
+
+
+  const rent =
+    getSettingNumber(
+      "Rent",
+      12500
+    );
+
+
+  const electricity =
+    getSettingNumber(
+      "Electricity",
+      500
+    );
+
+
+  const available =
+    income -
+    rent -
+    electricity;
+
+
+  modalContainer().innerHTML = `
+
+    <div class="modal-backdrop setup-backdrop">
+
+      <div class="modal setup-wizard">
+
+        <div class="setup-step">
+
+          <div class="setup-logo">
+            ₹
+          </div>
+
+          <span class="eyebrow">
+            WELCOME TO MONEYFLOW
+          </span>
+
+          <h1>
+            Take control of your monthly money.
+          </h1>
+
+          <p class="muted">
+            First, let's set up your monthly income
+            and fixed expenses.
+          </p>
+
+
+          <label>
+
+            Monthly Income
+
+            <input
+              id="setupIncome"
+              type="number"
+              value="${income}"
+              min="0">
+
+          </label>
+
+
+          <label>
+
+            Rent
+
+            <input
+              id="setupRent"
+              type="number"
+              value="${rent}"
+              min="0">
+
+          </label>
+
+
+          <label>
+
+            Electricity
+
+            <input
+              id="setupElectricity"
+              type="number"
+              value="${electricity}"
+              min="0">
+
+          </label>
+
+
+          <div class="setup-summary">
+
+            <span>
+              Available for allocation
+            </span>
+
+            <strong id="setupAvailable">
+              ${money(available)}
+            </strong>
+
+          </div>
+
+
+          <button
+            class="primary-button full-width"
+            onclick="completeSetup()">
+
+            Continue
+
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  `;
+
+
+  ["setupIncome", "setupRent", "setupElectricity"]
+    .forEach(id => {
+
+      const input = $("#" + id);
+
+      if (input) {
+
+        input.addEventListener(
+          "input",
+          updateSetupAvailable
+        );
+
+      }
+
+    });
+
+}
+
+
+function updateSetupAvailable() {
+
+  const income =
+    number(
+      $("#setupIncome")?.value
+    );
+
+
+  const rent =
+    number(
+      $("#setupRent")?.value
+    );
+
+
+  const electricity =
+    number(
+      $("#setupElectricity")?.value
+    );
+
+
+  const available =
+    income -
+    rent -
+    electricity;
+
+
+  const element =
+    $("#setupAvailable");
+
+
+  if (element) {
+
+    element.textContent =
+      money(Math.max(0, available));
+
+  }
+
+}
+
+
+async function completeSetup() {
+
+  const income =
+    number(
+      $("#setupIncome")?.value
+    );
+
+
+  const rent =
+    number(
+      $("#setupRent")?.value
+    );
+
+
+  const electricity =
+    number(
+      $("#setupElectricity")?.value
+    );
+
+
+  if (income <= 0) {
+
+    showToast(
+      "Enter a valid monthly income.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (
+    rent + electricity >
+    income
+  ) {
+
+    showToast(
+      "Fixed expenses cannot exceed income.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  state.settings = {
+
+    ...state.settings,
+
+    MonthlyIncome:
+      String(income),
+
+    Rent:
+      String(rent),
+
+    Electricity:
+      String(electricity)
+
+  };
+
+
+  state.setupComplete = true;
+
+
+  saveLocalState();
+
+
+  try {
+
+    await api("saveSettings", {
+      settings: state.settings
+    });
+
+  } catch (error) {
+
+    console.warn(
+      "Setup saved locally."
+    );
+
+  }
+
+
+  modalContainer().innerHTML = "";
+
+
+  showToast(
+    "MoneyFlow setup complete!",
+    "success"
+  );
+
+
+  await refreshDashboard();
+
+  renderCurrentPage();
+
+}
+
+/* =========================================================
+   THEME
+   ========================================================= */
+
+function applySavedTheme() {
+
+  const theme =
+    localStorage.getItem(
+      CONFIG.THEME_KEY
+    );
+
+
+  if (theme === "dark") {
+
+    document.documentElement
+      .setAttribute(
+        "data-theme",
+        "dark"
+      );
+
+  }
+
+}
+
+
+function toggleTheme() {
+
+  const current =
+    document.documentElement
+      .getAttribute("data-theme");
+
+
+  const next =
+    current === "dark"
+      ? "light"
+      : "dark";
+
+
+  document.documentElement
+    .setAttribute(
+      "data-theme",
+      next
+    );
+
+
+  localStorage.setItem(
+    CONFIG.THEME_KEY,
+    next
+  );
+
+}
+
+
+/* =========================================================
+   DASHBOARD REFRESH
+   ========================================================= */
+
+async function refreshDashboard() {
+
+  try {
+
+    const data =
+      await api("getDashboard", {
+
+        month:
+          state.selectedMonth,
+
+        year:
+          state.selectedYear
+
+      });
+
+
+    state.dashboard =
+      data;
+
+
+    if (data?.expenses) {
+
+      state.expenses =
+        data.expenses;
+
+    }
+
+
+    saveLocalState();
+
+  } catch (error) {
+
+    console.warn(
+      "Dashboard refresh failed",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   NAVIGATION HELPER
+   ========================================================= */
+
+function navigateTo(page) {
+
+  state.currentPage =
+    page;
+
+  saveLocalState();
+
+  renderCurrentPage();
+
+}
+
+
+/* =========================================================
+   CALCULATIONS
+   ========================================================= */
+
+function getMonthExpenses() {
+
+  const month =
+    state.selectedMonth;
+
+  const year =
+    state.selectedYear;
+
+
+  return state.expenses.filter(
+    expense => {
+
+      const date =
+        new Date(expense.Date);
+
+
+      return (
+        date.getMonth() + 1 === month &&
+        date.getFullYear() === year
+      );
+
+    }
+  );
+
+}
+
+
+function getTotalAllocated() {
+
+  return normalizeBudget(
+    state.budget
+  ).reduce(
+    (sum, item) =>
+      sum + number(item.AllocatedAmount),
+    0
+  );
+
+}
+
+
+function getCategorySpent(category) {
+
+  return getMonthExpenses()
+    .filter(
+      expense =>
+        expense.Category === category
+    )
+    .reduce(
+      (sum, expense) =>
+        sum + number(expense.Amount),
+      0
+    );
+
+}
+
+
+function getCategoryStats() {
+
+  return getCategoryNames()
+    .map(category => {
+
+      const budget =
+        normalizeBudget(state.budget)
+          .find(
+            item =>
+              item.Category === category
+          );
+
+
+      return {
+
+        category,
+
+        allocated:
+          number(
+            budget?.AllocatedAmount
+          ),
+
+        spent:
+          getCategorySpent(category)
+
+      };
+
+    });
+
+}
+
+
+function calculateDaysRemaining() {
+
+  const now =
+    new Date();
+
+
+  const lastDay =
+    new Date(
+      state.selectedYear,
+      state.selectedMonth,
+      0
+    );
+
+
+  if (
+    now.getFullYear() !==
+      state.selectedYear ||
+    now.getMonth() + 1 !==
+      state.selectedMonth
+  ) {
+
+    return lastDay.getDate();
+
+  }
+
+
+  return Math.max(
+    1,
+    lastDay.getDate() -
+      now.getDate()
+  );
+
+}
+
+
+/* =========================================================
+   DATA NORMALIZATION
+   ========================================================= */
+
+function normalizeBudget(data) {
+
+  if (!Array.isArray(data)) {
+
+    return [];
+
+  }
+
+
+  return data
+    .map(item => {
+
+      if (typeof item === "object") {
+
+        return {
+
+          Category:
+            item.Category ||
+            item.category ||
+            "",
+
+          AllocatedAmount:
+            number(
+              item.AllocatedAmount ??
+              item.allocatedAmount ??
+              0
+            ),
+
+          BudgetID:
+            item.BudgetID ||
+            item.budgetID ||
+            ""
+
+        };
+
+      }
+
+      return null;
+
+    })
+    .filter(Boolean)
+    .filter(
+      item =>
+        item.Category
+    );
+
+}
+
+/* =========================================================
+   CSV EXPORT
+   ========================================================= */
+
+function exportCSV() {
+
+  const expenses =
+    getMonthExpenses();
+
+
+  if (!expenses.length) {
+
+    showToast(
+      "No expenses to export.",
+      "warning"
+    );
+
+    return;
+
+  }
+
+
+  const headers = [
+
+    "ExpenseID",
+    "Date",
+    "Amount",
+    "Purpose",
+    "Category",
+    "PaymentMethod",
+    "Notes"
+
+  ];
+
+
+  const rows =
+    expenses.map(expense => [
+
+      expense.ExpenseID,
+      expense.Date,
+      expense.Amount,
+      expense.Purpose,
+      expense.Category,
+      expense.PaymentMethod,
+      expense.Notes
+
+    ]);
+
+
+  const csv = [
+
+    headers,
+
+    ...rows
+
+  ]
+    .map(row =>
+      row.map(csvEscape).join(",")
+    )
+    .join("\n");
+
+
+  const blob =
+    new Blob(
+      [csv],
+      {
+        type:
+          "text/csv;charset=utf-8;"
+      }
+    );
+
+
+  const url =
+    URL.createObjectURL(blob);
+
+
+  const link =
+    document.createElement("a");
+
+
+  link.href = url;
+
+  link.download =
+    `MoneyFlow_${state.selectedYear}_${String(
+      state.selectedMonth
+    ).padStart(2, "0")}.csv`;
+
+
+  document.body.appendChild(link);
+
+  link.click();
+
+  link.remove();
+
+  URL.revokeObjectURL(url);
+
+
+  showToast(
+    "CSV exported",
+    "success"
+  );
+
+}
+
+
+function csvEscape(value) {
+
+  const text =
+    String(value ?? "");
+
+
+  if (
+    text.includes(",") ||
+    text.includes('"') ||
+    text.includes("\n")
+  ) {
+
+    return `"${text.replace(
+      /"/g,
+      '""'
+    )}"`;
+
+  }
+
+
+  return text;
+
+}
+
+
+/* =========================================================
+   RESET LOCAL DATA
+   ========================================================= */
+
+function resetLocalData() {
+
+  const confirmed =
+    confirm(
+      "Reset local MoneyFlow data? Server data will not be deleted."
+    );
+
+
+  if (!confirmed) return;
+
+
+  localStorage.removeItem(
+    CONFIG.STORAGE_KEY
+  );
+
+
+  location.reload();
+
+}
+
+
+/* =========================================================
+   UI HELPERS
+   ========================================================= */
+
+function emptyState(
+  title,
+  message
+) {
+
+  return `
+
+    <div class="empty-state">
+
+      <div class="empty-icon">
+        ₹
+      </div>
+
+      <h3>
+        ${escapeHtml(title)}
+      </h3>
+
+      <p>
+        ${escapeHtml(message)}
+      </p>
+
+    </div>
+
+  `;
+
+}
+
+
+function showToast(
+  message,
+  type = "info"
+) {
+
+  const toast =
+    toastElement();
+
+
+  if (!toast) {
+
+    console.log(message);
+
+    return;
+
+  }
+
+
+  toast.textContent =
+    message;
+
+
+  toast.className =
+    `toast toast-${type} show`;
+
+
+  clearTimeout(
+    window.moneyflowToastTimer
+  );
+
+
+  window.moneyflowToastTimer =
+    setTimeout(() => {
+
+      toast.classList.remove(
+        "show"
+      );
+
+    }, 3000);
+
+}
+
+
+function money(value) {
+
+  const amount =
+    number(value);
+
+
+  return CONFIG.CURRENCY +
+    amount.toLocaleString(
+      "en-IN",
+      {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+      }
+    );
+
+}
+
+
+function percent(value) {
+
+  return `${number(value).toFixed(0)}%`;
+
+}
+
+
+function number(value) {
+
+  const n =
+    parseFloat(value);
+
+
+  return Number.isFinite(n)
+    ? n
+    : 0;
+
+}
+
+
+function cleanText(value) {
+
+  return String(
+    value ?? ""
+  )
+    .trim()
+    .replace(/\s+/g, " ");
+
+}
+
+
+function escapeHtml(value) {
+
+  return String(
+    value ?? ""
+  )
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+}
+
+
+function formatDate(dateValue) {
+
+  if (!dateValue) return "";
+
+  const date =
+    new Date(dateValue);
+
+
+  if (Number.isNaN(date.getTime())) {
+
+    return dateValue;
+
+  }
+
+
+  return date.toLocaleDateString(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "short"
+    }
+  );
+
+}
+
+
+function generateId(prefix) {
+
+  return (
+    prefix +
+    "_" +
+    Date.now() +
+    "_" +
+    Math.random()
+      .toString(36)
+      .substring(2, 8)
+  );
+
+}
+
+
+function generateBudgetId(category) {
+
+  return (
+    "BUDGET_" +
+    state.selectedYear +
+    "_" +
+    String(
+      state.selectedMonth
+    ).padStart(2, "0") +
+    "_" +
+    cleanText(category)
+      .replace(/\s+/g, "_")
+      .toUpperCase()
+  );
+
+}
+
+
+function getSettingNumber(
+  key,
+  fallback
+) {
+
+  const value =
+    state.settings?.[key];
+
+
+  const parsed =
+    number(value);
+
+
+  return parsed > 0
+    ? parsed
+    : fallback;
+
+}
+
+
+function categoryIcon(category) {
+
+  const icons = {
+
+    "Daily Needs": "🛒",
+    "Food": "🍽️",
+    "Entertainment": "🎬",
+    "Rent": "🏠",
+    "Electricity": "⚡",
+    "Travel / Trip": "✈️",
+    "Health": "❤️",
+    "Shopping": "🛍️",
+    "Bills": "🧾",
+    "Family": "👨‍👩‍👧",
+    "Education": "📚",
+    "Savings": "💰",
+    "Emergency": "🛡️",
+    "Other": "📦"
+
+  };
+
+
+  return icons[category] || "₹";
+
+}
+
+/* =========================================================
+   GLOBAL ACCESS
+   ========================================================= */
+
+window.changeMonth =
+  changeMonth;
+
+window.navigateTo =
+  navigateTo;
+
+window.showExpenseModal =
+  showExpenseModal;
+
+window.closeModal =
+  closeModal;
+
+window.submitExpense =
+  submitExpense;
+
+window.quickExpense =
+  quickExpense;
+
+window.setExpenseAmount =
+  setExpenseAmount;
+
+window.deleteExpenseConfirm =
+  deleteExpenseConfirm;
+
+window.filterExpenses =
+  filterExpenses;
+
+window.saveBudgetAction =
+  saveBudgetAction;
+
+window.copyPreviousBudgetAction =
+  copyPreviousBudgetAction;
+
+window.saveSettingsAction =
+  saveSettingsAction;
+
+window.addNewCategory =
+  addNewCategory;
+
+window.completeSetup =
+  completeSetup;
+
+window.toggleTheme =
+  toggleTheme;
+
+window.exportCSV =
+  exportCSV;
+
+window.resetLocalData =
+  resetLocalData;
+
+
+/* =========================================================
+   END
+   ========================================================= */
