@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width,
+             initial-scale=1.0,
+             maximum-scale=1.0,
+             user-scalable=no"
+  >
+
+  <meta
+    name="theme-color"
+    content="#0B1020"
+  >
+
+  <meta
+    name="description"
+    content="MoneyFlow - Personal Household Money Management"
+  >
+
+  <title>MoneyFlow</title>
+
+  <link
+    rel="manifest"
+    href="manifest.json"
+  >
+
+  <link
+    rel="stylesheet"
+    href="styles.css"
+  >
+
+</head>
+
+
+<body>
+
+<!-- =========================================
+     APPLICATION
+========================================= -->
+
+<div id="app">
+
+
+  <!-- =======================================
+       TOP HEADER
+  ======================================== -->
+
+  <header class="topbar">
+
+    <div class="brand-area">
+
+      <div class="brand">
+        MoneyFlow
+      </div>
+
+      <div
+        id="currentMonth"
+        class="month-label"
+      >
+        September 2026
+      </div>
+
+    </div>
+
+
+    <div class="header-actions">
+
+      <button
+        id="themeButton"
+        class="icon-button"
+        type="button"
+        aria-label="Change theme"
+      >
+        ◐
+      </button>
+
+
+      <button
+        id="settingsButton"
+        class="icon-button"
+        type="button"
+        aria-label="Settings"
+      >
+        ⚙
+      </button>
+
+    </div>
+
+  </header>
+
+
+
+  <!-- =======================================
+       MAIN CONTENT
+  ======================================== -->
+
+  <main
+    id="mainContent"
+    class="main-content"
+  >
+  </main>
+
+
+
+  <!-- =======================================
+       ADD EXPENSE BUTTON
+  ======================================== -->
+
+  <button
+    id="addExpenseButton"
+    class="floating-button"
+    type="button"
+  >
+
+    <span class="floating-icon">
+      ＋
+    </span>
+
+    <span class="floating-text">
+      Add Expense
+    </span>
+
+  </button>
+
+
+
+  <!-- =======================================
+       BOTTOM NAVIGATION
+  ======================================== -->
+
+  <nav class="bottom-navigation">
+
+
+    <button
+      class="nav-button active"
+      data-page="dashboard"
+      type="button"
+    >
+
+      <span class="nav-icon">
+        ⌂
+      </span>
+
+      <span class="nav-label">
+        Home
+      </span>
+
+    </button>
+
+
+
+    <button
+      class="nav-button"
+      data-page="expenses"
+      type="button"
+    >
+
+      <span class="nav-icon">
+        ↕
+      </span>
+
+      <span class="nav-label">
+        Expenses
+      </span>
+
+    </button>
+
+
+
+    <button
+      class="nav-button"
+      data-page="budget"
+      type="button"
+    >
+
+      <span class="nav-icon">
+        ◫
+      </span>
+
+      <span class="nav-label">
+        Budget
+      </span>
+
+    </button>
+
+
+
+    <button
+      class="nav-button"
+      data-page="insights"
+      type="button"
+    >
+
+      <span class="nav-icon">
+        ✦
+      </span>
+
+      <span class="nav-label">
+        Insights
+      </span>
+
+    </button>
+
+
+
+    <button
+      class="nav-button"
+      data-page="settings"
+      type="button"
+    >
+
+      <span class="nav-icon">
+        ⚙
+      </span>
+
+      <span class="nav-label">
+        Settings
+      </span>
+
+    </button>
+
+
+  </nav>
+
+
+</div>
+
+
+
+<!-- =========================================
+     MODAL CONTAINER
+========================================= -->
+
+<div
+  id="modalContainer"
+  class="modal-container"
+>
+</div>
+
+
+
+<!-- =========================================
+     TOAST MESSAGE
+========================================= -->
+
+<div
+  id="toast"
+  class="toast"
+>
+</div>
+
+
+
+<!-- =========================================
+     JAVASCRIPT
+========================================= -->
+
+<script src="app.js"></script>
+
+</body>
+
+</html>
